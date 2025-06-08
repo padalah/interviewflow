@@ -8,8 +8,23 @@ import Feedback from '../components/interview/Feedback';
 import DocumentUpload from '../components/premium/DocumentUpload';
 import CultureSelector from '../components/premium/CultureSelector';
 import CodeEditor from '../components/interview/CodeEditor';
-import { Play, Square, Zap, Upload, Settings } from 'lucide-react';
-import { InterviewType, PlanTier, WebSocketMessage, StartInterviewRequest, StartInterviewResponse } from '../types/interview';
+import { Play, Square, Zap, AlertCircle } from 'lucide-react';
+import { InterviewType, PlanTier, WebSocketMessage } from '../types/interview';
+
+// Define types for API requests/responses
+interface StartInterviewRequest {
+  interviewType: string;
+  planTier: string;
+  resumeData?: string;
+  jobDescription?: string;
+  companyCulture?: string;
+}
+
+interface StartInterviewResponse {
+  sessionId: string;
+  initialGreeting: string;
+  websocketUrl: string;
+}
 
 const Interview: React.FC = () => {
   const { state, startSession, endSession, addMessage, addFeedback, setRecording, setConnected, setError, clearError } = useInterview();
@@ -19,6 +34,9 @@ const Interview: React.FC = () => {
   const [resumeData, setResumeData] = useState<string>('');
   const [jobDescription, setJobDescription] = useState<string>('');
   const [companyCulture, setCompanyCulture] = useState<string>('');
+
+  // Get API URL with fallback
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   // WebSocket connection for real-time communication
   const { isConnected, connect, disconnect, sendAudio, sendMessage } = useWebSocket({
@@ -87,7 +105,11 @@ const Interview: React.FC = () => {
 
   const handleStartInterview = async () => {
     setIsStarting(true);
+    clearError();
+    
     try {
+      console.log('Starting interview with API URL:', API_URL);
+      
       const requestData: StartInterviewRequest = {
         interviewType: selectedType,
         planTier: planTier,
@@ -96,7 +118,9 @@ const Interview: React.FC = () => {
         companyCulture: planTier === 'premium' ? companyCulture : undefined,
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/start_interview`, {
+      console.log('Request data:', requestData);
+
+      const response = await fetch(`${API_URL}/start_interview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,26 +128,48 @@ const Interview: React.FC = () => {
         body: JSON.stringify(requestData),
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch {
+          // If we can't parse the error response, use the status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const data: StartInterviewResponse = await response.json();
+      console.log('Response data:', data);
       
+      // Start the session with the received data
       startSession(selectedType, planTier, data.sessionId, data.websocketUrl);
       
+      // Add the initial greeting message
       addMessage({
         type: 'ai',
         content: data.initialGreeting,
       });
 
       // Connect to WebSocket
+      console.log('Connecting to WebSocket:', data.websocketUrl);
       connect(data.websocketUrl);
       
     } catch (error) {
       console.error('Failed to start interview:', error);
-      setError(error instanceof Error ? error.message : 'Failed to start interview');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start interview';
+      
+      // Provide more specific error messages
+      if (errorMessage.includes('Failed to fetch')) {
+        setError('Unable to connect to the server. Please make sure the backend is running on ' + API_URL);
+      } else if (errorMessage.includes('NetworkError')) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsStarting(false);
     }
@@ -162,6 +208,14 @@ const Interview: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
           Start Your Interview Practice
         </h1>
+        
+        {/* API Connection Status */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>API Endpoint:</span>
+            <code className="bg-gray-200 px-2 py-1 rounded text-xs">{API_URL}</code>
+          </div>
+        </div>
         
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -233,7 +287,23 @@ const Interview: React.FC = () => {
 
         {state.error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800">{state.error}</p>
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-red-900 mb-1">Error</h4>
+                <p className="text-red-800 text-sm">{state.error}</p>
+                {state.error.includes('Unable to connect') && (
+                  <div className="mt-2 text-sm text-red-700">
+                    <p className="font-medium">Troubleshooting steps:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Make sure the backend server is running</li>
+                      <li>Check that the API URL is correct</li>
+                      <li>Verify your internet connection</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -303,7 +373,10 @@ const Interview: React.FC = () => {
 
               {state.error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-red-800 text-sm">{state.error}</p>
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                    <p className="text-red-800 text-sm">{state.error}</p>
+                  </div>
                 </div>
               )}
 
