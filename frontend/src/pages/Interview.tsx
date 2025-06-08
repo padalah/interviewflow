@@ -1,14 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInterview } from '../contexts/InterviewContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { Button } from '../components/common/Button';
-import { Play, Pause, Square, Settings } from 'lucide-react';
-import { InterviewType, PlanTier, StartInterviewRequest, StartInterviewResponse } from '../types/interview';
+import AudioRecorder from '../components/interview/AudioRecorder';
+import Transcript from '../components/interview/Transcript';
+import Feedback from '../components/interview/Feedback';
+import DocumentUpload from '../components/premium/DocumentUpload';
+import CultureSelector from '../components/premium/CultureSelector';
+import CodeEditor from '../components/interview/CodeEditor';
+import { Play, Square, Zap, Upload, Settings } from 'lucide-react';
+import { InterviewType, PlanTier, WebSocketMessage, StartInterviewRequest, StartInterviewResponse } from '../types/interview';
 
 const Interview: React.FC = () => {
-  const { state, startSession, endSession, addMessage, setError } = useInterview();
+  const { state, startSession, endSession, addMessage, addFeedback, setRecording, setConnected, setError, clearError } = useInterview();
   const [selectedType, setSelectedType] = useState<InterviewType>('general');
-  const [planTier] = useState<PlanTier>('free'); // For MVP, default to free
+  const [planTier] = useState<PlanTier>('free');
   const [isStarting, setIsStarting] = useState(false);
+  const [resumeData, setResumeData] = useState<string>('');
+  const [jobDescription, setJobDescription] = useState<string>('');
+  const [companyCulture, setCompanyCulture] = useState<string>('');
+
+  // WebSocket connection for real-time communication
+  const { isConnected, connect, disconnect, sendAudio, sendMessage } = useWebSocket({
+    onMessage: (message: WebSocketMessage) => {
+      switch (message.type) {
+        case 'transcript':
+          addMessage({
+            type: message.data.speaker === 'user' ? 'user' : 'ai',
+            content: message.data.text,
+            audioUrl: message.data.audioUrl,
+          });
+          break;
+        case 'feedback':
+          addFeedback({
+            messageId: message.data.messageId || '',
+            type: planTier === 'premium' ? 'detailed' : 'basic',
+            content: message.data.content,
+            score: message.data.score,
+            suggestions: message.data.suggestions,
+          });
+          break;
+        case 'audio':
+          if (message.data instanceof ArrayBuffer || message.data instanceof Blob) {
+            playAudioResponse(message.data);
+          }
+          break;
+        case 'error':
+          setError(message.data.message);
+          break;
+        case 'control':
+          if (message.data.status === 'ended') {
+            endSession();
+          }
+          break;
+      }
+    },
+    onConnect: () => {
+      setConnected(true);
+      clearError();
+    },
+    onDisconnect: () => {
+      setConnected(false);
+    },
+    onError: () => {
+      setError('Connection error occurred');
+    },
+  });
+
+  const playAudioResponse = (audioData: ArrayBuffer | Blob) => {
+    try {
+      const blob = audioData instanceof Blob ? audioData : new Blob([audioData], { type: 'audio/webm' });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      audio.play().catch(err => {
+        console.error('Error playing AI audio:', err);
+      });
+    } catch (err) {
+      console.error('Error creating audio from response:', err);
+    }
+  };
 
   const handleStartInterview = async () => {
     setIsStarting(true);
@@ -16,6 +91,9 @@ const Interview: React.FC = () => {
       const requestData: StartInterviewRequest = {
         interviewType: selectedType,
         planTier: planTier,
+        resumeData: planTier === 'premium' ? resumeData : undefined,
+        jobDescription: planTier === 'premium' ? jobDescription : undefined,
+        companyCulture: planTier === 'premium' ? companyCulture : undefined,
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/start_interview`, {
@@ -27,23 +105,21 @@ const Interview: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
       const data: StartInterviewResponse = await response.json();
       
-      // Start the session with the received sessionId and websocketUrl
       startSession(selectedType, planTier, data.sessionId, data.websocketUrl);
       
-      // Add the initial greeting as the first AI message
       addMessage({
         type: 'ai',
         content: data.initialGreeting,
       });
 
-      // Connect to WebSocket using the dynamic URL
-      // Note: This assumes useWebSocket hook exists and has a connect function
-      // The actual WebSocket connection should be handled in the component that uses useWebSocket
+      // Connect to WebSocket
+      connect(data.websocketUrl);
       
     } catch (error) {
       console.error('Failed to start interview:', error);
@@ -54,11 +130,34 @@ const Interview: React.FC = () => {
   };
 
   const handleEndInterview = () => {
+    if (isConnected) {
+      sendMessage({
+        type: 'control',
+        data: { action: 'end_interview' },
+        timestamp: Date.now(),
+      });
+    }
+    
+    disconnect();
     endSession();
   };
 
+  const handleAudioChunk = (audioData: ArrayBuffer) => {
+    if (isConnected && audioData.byteLength > 0) {
+      sendAudio(audioData);
+    }
+  };
+
+  const handleRecordingChange = (isRecording: boolean) => {
+    setRecording(isRecording);
+  };
+
+  useEffect(() => {
+    setConnected(isConnected);
+  }, [isConnected, setConnected]);
+
   const renderSetupPhase = () => (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
           Start Your Interview Practice
@@ -98,6 +197,20 @@ const Interview: React.FC = () => {
           </div>
         </div>
 
+        {/* Premium Features */}
+        {planTier === 'premium' && (
+          <div className="space-y-6 mb-6">
+            <DocumentUpload
+              onResumeUpload={setResumeData}
+              onJobDescriptionUpload={setJobDescription}
+            />
+            <CultureSelector
+              selectedCulture={companyCulture}
+              onCultureChange={setCompanyCulture}
+            />
+          </div>
+        )}
+
         {planTier === 'free' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h4 className="font-medium text-blue-900 mb-2">Free Tier Benefits</h4>
@@ -110,7 +223,8 @@ const Interview: React.FC = () => {
               variant="outline"
               size="sm"
               className="mt-3 text-blue-700 border-blue-300 hover:bg-blue-100"
-              onClick={() => {/* Navigate to pricing */}}
+              onClick={() => window.location.href = '/pricing'}
+              icon={Zap}
             >
               Upgrade for Premium Features
             </Button>
@@ -131,6 +245,7 @@ const Interview: React.FC = () => {
             onClick={handleStartInterview}
             disabled={isStarting}
             className="px-8"
+            loading={isStarting}
           >
             {isStarting ? 'Starting...' : 'Start Interview'}
           </Button>
@@ -166,56 +281,33 @@ const Interview: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6">
-              {/* Audio Recorder Placeholder */}
-              <div className="text-center mb-6">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  {state.isRecording ? (
-                    <div className="w-8 h-8 bg-red-500 rounded-full animate-pulse"></div>
-                  ) : (
-                    <Settings className="w-8 h-8 text-gray-400" />
-                  )}
+            <div className="p-6 space-y-6">
+              {/* Audio Recorder */}
+              <AudioRecorder
+                isActive={state.currentSession?.status === 'active' || true}
+                onAudioChunk={handleAudioChunk}
+                onRecordingChange={handleRecordingChange}
+              />
+
+              {/* Technical Interview Code Editor */}
+              {selectedType === 'technical' && (
+                <CodeEditor
+                  onCodeSubmit={(code) => {
+                    addMessage({
+                      type: 'user',
+                      content: `Code submission:\n\`\`\`\n${code}\n\`\`\``,
+                    });
+                  }}
+                />
+              )}
+
+              {state.error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-800 text-sm">{state.error}</p>
                 </div>
-                <p className="text-gray-600">
-                  {state.isRecording ? 'Listening...' : 'Click to start speaking'}
-                </p>
-              </div>
+              )}
 
-              {/* Messages Display */}
-              <div className="bg-gray-50 rounded-lg p-4 h-64 overflow-y-auto mb-4">
-                {state.messages.length > 0 ? (
-                  <div className="space-y-4">
-                    {state.messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.type === 'user' 
-                            ? 'bg-primary-500 text-white' 
-                            : 'bg-white text-gray-800 border'
-                        }`}>
-                          <p className="text-sm">{message.content}</p>
-                          <p className="text-xs mt-1 opacity-70">
-                            {message.timestamp.toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center">
-                    Interview transcript will appear here...
-                  </p>
-                )}
-              </div>
-
-              {/* Controls */}
               <div className="flex justify-center gap-3">
-                <Button
-                  variant={state.isRecording ? 'secondary' : 'primary'}
-                  icon={state.isRecording ? Pause : Play}
-                  onClick={() => {/* Toggle recording */}}
-                >
-                  {state.isRecording ? 'Pause' : 'Speak'}
-                </Button>
                 <Button
                   variant="outline"
                   icon={Square}
@@ -228,40 +320,17 @@ const Interview: React.FC = () => {
           </div>
         </div>
 
-        {/* Feedback Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-lg h-full">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Real-time Feedback
-              </h3>
-            </div>
-            <div className="p-6">
-              <div className="text-center text-gray-500">
-                <p className="mb-4">Feedback will appear here as you practice</p>
-                <div className="space-y-3">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                      <div className="bg-primary-600 h-2 rounded-full" style={{width: '0%'}}></div>
-                    </div>
-                    <p className="text-sm text-gray-600">Clarity</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                      <div className="bg-primary-600 h-2 rounded-full" style={{width: '0%'}}></div>
-                    </div>
-                    <p className="text-sm text-gray-600">Confidence</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                      <div className="bg-primary-600 h-2 rounded-full" style={{width: '0%'}}></div>
-                    </div>
-                    <p className="text-sm text-gray-600">Relevance</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Right Sidebar */}
+        <div className="lg:col-span-1 space-y-6">
+          <Transcript
+            messages={state.messages}
+            className="h-64"
+          />
+
+          <Feedback
+            feedback={state.feedback}
+            planTier={planTier}
+          />
         </div>
       </div>
     </div>
@@ -270,7 +339,7 @@ const Interview: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {state.currentSession?.status === 'setup' || !state.currentSession
+        {(!state.currentSession || state.currentSession.status === 'setup')
           ? renderSetupPhase()
           : renderActiveInterview()
         }
