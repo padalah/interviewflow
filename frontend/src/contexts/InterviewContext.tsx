@@ -85,7 +85,7 @@ const interviewReducer = (state: InterviewState, action: InterviewAction): Inter
 
 interface InterviewContextType {
   state: InterviewState;
-  startSession: (type: InterviewType, planTier: PlanTier) => void;
+  startSession: (type: InterviewType, planTier: PlanTier, sessionId: string, websocketUrl: string) => void;
   endSession: () => void;
   addMessage: (message: Omit<InterviewMessage, 'id' | 'timestamp'>) => void;
   addFeedback: (feedback: Omit<InterviewFeedback, 'id'>) => void;
@@ -113,13 +113,14 @@ interface InterviewProviderProps {
 export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(interviewReducer, initialState);
 
-  const startSession = (type: InterviewType, planTier: PlanTier) => {
+  const startSession = (type: InterviewType, planTier: PlanTier, sessionId: string, websocketUrl: string) => {
     const session: InterviewSession = {
-      id: `session_${Date.now()}`,
+      id: sessionId,
       type,
       status: 'setup',
       planTier,
       startTime: new Date(),
+      websocketUrl,
     };
     dispatch({ type: 'START_SESSION', payload: session });
   };

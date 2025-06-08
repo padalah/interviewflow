@@ -2,15 +2,55 @@ import React, { useState } from 'react';
 import { useInterview } from '../contexts/InterviewContext';
 import { Button } from '../components/common/Button';
 import { Play, Pause, Square, Settings } from 'lucide-react';
-import { InterviewType, PlanTier } from '../types/interview';
+import { InterviewType, PlanTier, StartInterviewRequest, StartInterviewResponse } from '../types/interview';
 
 const Interview: React.FC = () => {
-  const { state, startSession, endSession } = useInterview();
+  const { state, startSession, endSession, addMessage, setError } = useInterview();
   const [selectedType, setSelectedType] = useState<InterviewType>('general');
   const [planTier] = useState<PlanTier>('free'); // For MVP, default to free
+  const [isStarting, setIsStarting] = useState(false);
 
-  const handleStartInterview = () => {
-    startSession(selectedType, planTier);
+  const handleStartInterview = async () => {
+    setIsStarting(true);
+    try {
+      const requestData: StartInterviewRequest = {
+        interviewType: selectedType,
+        planTier: planTier,
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/start_interview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: StartInterviewResponse = await response.json();
+      
+      // Start the session with the received sessionId and websocketUrl
+      startSession(selectedType, planTier, data.sessionId, data.websocketUrl);
+      
+      // Add the initial greeting as the first AI message
+      addMessage({
+        type: 'ai',
+        content: data.initialGreeting,
+      });
+
+      // Connect to WebSocket using the dynamic URL
+      // Note: This assumes useWebSocket hook exists and has a connect function
+      // The actual WebSocket connection should be handled in the component that uses useWebSocket
+      
+    } catch (error) {
+      console.error('Failed to start interview:', error);
+      setError(error instanceof Error ? error.message : 'Failed to start interview');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleEndInterview = () => {
@@ -77,15 +117,22 @@ const Interview: React.FC = () => {
           </div>
         )}
 
+        {state.error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-800">{state.error}</p>
+          </div>
+        )}
+
         <div className="flex justify-center">
           <Button
             variant="primary"
             size="lg"
             icon={Play}
             onClick={handleStartInterview}
+            disabled={isStarting}
             className="px-8"
           >
-            Start Interview
+            {isStarting ? 'Starting...' : 'Start Interview'}
           </Button>
         </div>
       </div>
@@ -134,11 +181,30 @@ const Interview: React.FC = () => {
                 </p>
               </div>
 
-              {/* Transcript Area Placeholder */}
+              {/* Messages Display */}
               <div className="bg-gray-50 rounded-lg p-4 h-64 overflow-y-auto mb-4">
-                <p className="text-gray-500 text-center">
-                  Interview transcript will appear here...
-                </p>
+                {state.messages.length > 0 ? (
+                  <div className="space-y-4">
+                    {state.messages.map((message) => (
+                      <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.type === 'user' 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-white text-gray-800 border'
+                        }`}>
+                          <p className="text-sm">{message.content}</p>
+                          <p className="text-xs mt-1 opacity-70">
+                            {message.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center">
+                    Interview transcript will appear here...
+                  </p>
+                )}
               </div>
 
               {/* Controls */}

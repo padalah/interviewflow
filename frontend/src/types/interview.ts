@@ -5,6 +5,7 @@ export interface InterviewSession {
   planTier: PlanTier;
   startTime: Date;
   endTime?: Date;
+  websocketUrl?: string;
 }
 
 export interface InterviewMessage {
