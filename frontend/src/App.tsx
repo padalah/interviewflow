@@ -1,20 +1,29 @@
 import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { InterviewProvider } from './contexts/InterviewContext';
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+import Home from './pages/Home';
+import Interview from './pages/Interview';
+import Pricing from './pages/Pricing';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center text-primary-600 mb-6">
-          InterviewFlow AI
-        </h1>
-        <p className="text-gray-600 mb-4 text-center">
-          Your AI-powered interview practice platform
-        </p>
-        <div className="flex justify-center">
-          <button className="btn btn-primary">Get Started</button>
+    <InterviewProvider>
+      <Router>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/interview" element={<Interview />} />
+              <Route path="/pricing" element={<Pricing />} />
+            </Routes>
+          </main>
+          <Footer />
         </div>
-      </div>
-    </div>
+      </Router>
+    </InterviewProvider>
   );
 }
 
