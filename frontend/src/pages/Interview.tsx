@@ -38,6 +38,11 @@ const Interview: React.FC = () => {
   // Get API URL with fallback
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+  // Add debug logging when component renders
+  console.log('🎬 Interview component rendered');
+  console.log('📊 Current state:', state);
+  console.log('🔧 API_URL:', API_URL);
+
   // WebSocket connection for real-time communication
   const { isConnected, connect, disconnect, sendAudio, sendMessage } = useWebSocket({
     onMessage: (message: WebSocketMessage) => {
@@ -103,10 +108,10 @@ const Interview: React.FC = () => {
     }
   };
 
-  // Simple test function to verify button works
-  const testButtonClick = () => {
-    console.log('Test button clicked! This proves the click handler works.');
-    alert('Test button is working! The issue is not with click handling.');
+  // Direct test function
+  const directTest = () => {
+    console.log('🎯 DIRECT TEST CLICKED!');
+    alert('Direct test function works!');
   };
 
   const handleStartInterview = async () => {
@@ -216,6 +221,18 @@ const Interview: React.FC = () => {
           Start Your Interview Practice
         </h1>
         
+        {/* DEBUG SECTION - This should be visible */}
+        <div className="mb-6 p-4 bg-red-100 border-2 border-red-500 rounded-lg">
+          <h2 className="text-red-900 font-bold mb-2">🚨 DEBUG SECTION</h2>
+          <p className="text-red-800 mb-3">If you can see this red box, React is working fine!</p>
+          <button
+            onClick={directTest}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            🔴 RED DEBUG BUTTON
+          </button>
+        </div>
+        
         {/* API Connection Status */}
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -313,31 +330,6 @@ const Interview: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* DEBUG: Test buttons to diagnose the issue */}
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h4 className="font-medium text-yellow-900 mb-2">🔧 Debug Test</h4>
-          <p className="text-sm text-yellow-800 mb-3">
-            Testing button functionality. Both buttons should work:
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={testButtonClick}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              Test Button (Plain HTML)
-            </button>
-            <button
-              onClick={() => {
-                console.log('Simple arrow function test');
-                alert('Simple arrow function works!');
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Arrow Function Test
-            </button>
-          </div>
-        </div>
 
         <div className="flex justify-center">
           <Button
