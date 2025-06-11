@@ -104,11 +104,12 @@ const Interview: React.FC = () => {
   };
 
   const handleStartInterview = async () => {
+    console.log('Starting interview...');
     setIsStarting(true);
     clearError();
     
     try {
-      console.log('Starting interview with API URL:', API_URL);
+      console.log('API URL:', API_URL);
       
       const requestData: StartInterviewRequest = {
         interviewType: selectedType,
