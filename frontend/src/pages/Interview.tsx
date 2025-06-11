@@ -104,7 +104,7 @@ const Interview: React.FC = () => {
   };
 
   const handleStartInterview = async () => {
-    console.log('Starting interview...');
+    console.log('handleStartInterview called!'); // Debug log
     setIsStarting(true);
     clearError();
     
@@ -174,6 +174,12 @@ const Interview: React.FC = () => {
     } finally {
       setIsStarting(false);
     }
+  };
+
+  // Simple test function to verify button works
+  const testButtonClick = () => {
+    console.log('Test button clicked!');
+    alert('Button is working!');
   };
 
   const handleEndInterview = () => {
@@ -308,7 +314,16 @@ const Interview: React.FC = () => {
           </div>
         )}
 
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
+          {/* Test button to verify clicking works */}
+          <button
+            onClick={testButtonClick}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            Test Button
+          </button>
+          
+          {/* Main start button */}
           <Button
             variant="primary"
             size="lg"
