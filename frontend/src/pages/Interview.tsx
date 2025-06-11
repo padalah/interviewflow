@@ -103,13 +103,19 @@ const Interview: React.FC = () => {
     }
   };
 
+  // Simple test function to verify button works
+  const testButtonClick = () => {
+    console.log('Test button clicked! This proves the click handler works.');
+    alert('Test button is working! The issue is not with click handling.');
+  };
+
   const handleStartInterview = async () => {
-    console.log('handleStartInterview called!'); // Debug log
+    console.log('🚀 handleStartInterview called!');
     setIsStarting(true);
     clearError();
     
     try {
-      console.log('API URL:', API_URL);
+      console.log('📡 Starting interview with API URL:', API_URL);
       
       const requestData: StartInterviewRequest = {
         interviewType: selectedType,
@@ -119,7 +125,7 @@ const Interview: React.FC = () => {
         companyCulture: planTier === 'premium' ? companyCulture : undefined,
       };
 
-      console.log('Request data:', requestData);
+      console.log('📦 Request data:', requestData);
 
       const response = await fetch(`${API_URL}/start_interview`, {
         method: 'POST',
@@ -129,7 +135,7 @@ const Interview: React.FC = () => {
         body: JSON.stringify(requestData),
       });
 
-      console.log('Response status:', response.status);
+      console.log('📡 Response status:', response.status);
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -144,7 +150,7 @@ const Interview: React.FC = () => {
       }
 
       const data: StartInterviewResponse = await response.json();
-      console.log('Response data:', data);
+      console.log('✅ Response data:', data);
       
       // Start the session with the received data
       startSession(selectedType, planTier, data.sessionId, data.websocketUrl);
@@ -156,11 +162,11 @@ const Interview: React.FC = () => {
       });
 
       // Connect to WebSocket
-      console.log('Connecting to WebSocket:', data.websocketUrl);
+      console.log('🔌 Connecting to WebSocket:', data.websocketUrl);
       connect(data.websocketUrl);
       
     } catch (error) {
-      console.error('Failed to start interview:', error);
+      console.error('❌ Failed to start interview:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to start interview';
       
       // Provide more specific error messages
@@ -174,12 +180,6 @@ const Interview: React.FC = () => {
     } finally {
       setIsStarting(false);
     }
-  };
-
-  // Simple test function to verify button works
-  const testButtonClick = () => {
-    console.log('Test button clicked!');
-    alert('Button is working!');
   };
 
   const handleEndInterview = () => {
@@ -314,16 +314,32 @@ const Interview: React.FC = () => {
           </div>
         )}
 
-        <div className="flex justify-center gap-4">
-          {/* Test button to verify clicking works */}
-          <button
-            onClick={testButtonClick}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Test Button
-          </button>
-          
-          {/* Main start button */}
+        {/* DEBUG: Test buttons to diagnose the issue */}
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h4 className="font-medium text-yellow-900 mb-2">🔧 Debug Test</h4>
+          <p className="text-sm text-yellow-800 mb-3">
+            Testing button functionality. Both buttons should work:
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={testButtonClick}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            >
+              Test Button (Plain HTML)
+            </button>
+            <button
+              onClick={() => {
+                console.log('Simple arrow function test');
+                alert('Simple arrow function works!');
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Arrow Function Test
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-center">
           <Button
             variant="primary"
             size="lg"
