@@ -12,18 +12,17 @@ const Header: React.FC = () => {
 
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'Practice', href: '/interview' },
     { name: 'Pricing', href: '/pricing' },
   ];
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Brain className="h-6 w-6 text-white" />
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Brain className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-gray-900">InterviewFlow AI</span>
           </Link>
@@ -36,8 +35,8 @@ const Header: React.FC = () => {
                 to={item.href}
                 className={`text-sm font-medium transition-colors ${
                   isActive(item.href)
-                    ? 'text-primary-600'
-                    : 'text-gray-700 hover:text-primary-600'
+                    ? 'text-blue-600'
+                    : 'text-gray-700 hover:text-blue-600'
                 }`}
               >
                 {item.name}
@@ -47,11 +46,8 @@ const Header: React.FC = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="border-gray-300 text-gray-700 hover:bg-gray-50">
               Sign In
-            </Button>
-            <Button variant="primary" size="sm">
-              Get Started
             </Button>
           </div>
 
@@ -78,8 +74,8 @@ const Header: React.FC = () => {
                   to={item.href}
                   className={`text-base font-medium transition-colors ${
                     isActive(item.href)
-                      ? 'text-primary-600'
-                      : 'text-gray-700 hover:text-primary-600'
+                      ? 'text-blue-600'
+                      : 'text-gray-700 hover:text-blue-600'
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -87,11 +83,8 @@ const Header: React.FC = () => {
                 </Link>
               ))}
               <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-200">
-                <Button variant="outline" size="sm" className="w-full">
+                <Button variant="outline" size="sm" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50">
                   Sign In
-                </Button>
-                <Button variant="primary" size="sm" className="w-full">
-                  Get Started
                 </Button>
               </div>
             </nav>
